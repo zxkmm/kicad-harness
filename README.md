@@ -1,14 +1,16 @@
 # kicad-harness
-
 Gives an AI coding agent **eyes and hands** on a KiCad project.
 
-Agents are already good at generating KiCad artifacts — footprints, netlists,
-placement scripts. What they lack is the other half of the loop: seeing whether
-the result is right, and applying it without a human copy-pasting into KiCad's
-built-in console. This harness supplies both.
-
-Companion to [kicad-footprint-generate](https://github.com/zxkmm/kicad-footprint-generate),
-which handles datasheet → footprint. This handles everything after that.
+## The CONCEPT
+### This is for
+- Assist designing: Assist you make partial circuit without copying recommend design from datasheet, for example, correctly use a Op-Amp.
+- Do the "worky" job for you: fanout for weird shaped BGA, calculating and then layouting LC ladder filter.
+- General helper: Review your design, offer help when you are stuck in designing.
+- A PoC to display what current frontier LLM can do in PCB designing.
+### This is not
+- An overall better than human PCB designer.
+- Designing PCB from scratch (though it can).
+- Something that designing faster and better than human (in complex but not trivial tasks, such as "Designing PCB from scratch" as listed above), this is actually quite low speed, for the demo project it cost nearly 1 hours to finish.
 
 ## Demos
 ### TP4056 battery charge controller
