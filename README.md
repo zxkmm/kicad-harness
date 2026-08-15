@@ -127,6 +127,14 @@ thin on purpose.
 - [`docs/LIVE_API.md`](docs/LIVE_API.md) — the kipy object model
 - [`docs/RECIPES.md`](docs/RECIPES.md) — worked examples
 
+## FAQ
+- A: Why it works not as good as what you have shown?
+  Q: This workflow rely on LLM capabilities very much. Only frontier LLMs can creates usable results.
+- A: It probably takes as long as human to make designs.
+  Q: You are half right, and moreover it actually takes longer to make a design than human. It took entire 1 hour to finish the demo project. That's why "the concept" guides you what it good at, and what not.
+- A: It takes same time for user to check the design.
+  Q: It takes same time or even longer to check C to Assembly code for old developers too, until human finally made compilers that has very less bugs. And nowadays human barely check generated Assembly anymore. Same here, I'm not trying to forcibly hitch this mediocre project onto GCC's states; I am merely saying a broad principle regarding how a "reliable" thing forms. And not to say if you follow "the concept", something this tool brings already faster than your bare hands.
+
 ## License
 
 See [LICENSE](LICENSE).
