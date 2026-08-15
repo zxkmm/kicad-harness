@@ -36,7 +36,8 @@ For the live layer, enable the API server in KiCad:
 
 ```bash
 kh sym TP4056                                  # find a real symbol id
-kh sym --pins Battery_Management:TP4056-42-ESOP8   # real pin numbers and types
+kh sym --pins Battery_Management:TP4056-42-ESOP8   # pin numbers, types, coordinates
+kh sym --sexpr Device:R                        # raw symbol body, for lib_symbols
 kh fp "USB_C receptacle"                       # find a real footprint id
 kh validate --symbols A,B --footprints C       # check ids before using them
 
@@ -47,6 +48,12 @@ kh nets --net GND                              # every pad on a net
 kh view --refs L1,L2,C3 --margin 3 --out v.png # frame those parts and render
 kh view --region 45,55,20,20 --out v.png       # explicit mm window
 kh view --layers courtyard --refs U1           # check for overlap
+
+kh sview --out sch.png                         # render a schematic sheet
+
+kh board-from-netlist --sch . --outline 20,20,38,26.5   # netlist -> .kicad_pcb
+kh place --pcb . --set U1=40,29 --set C1=33.5,34.5      # move parts, no KiCad
+kh outline --pcb . --rect 20,20,38,26.5                 # Edge.Cuts rectangle
 
 kh drc                                         # violations grouped by type
 kh erc

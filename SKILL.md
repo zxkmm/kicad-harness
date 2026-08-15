@@ -36,10 +36,15 @@ kh sym --pins Battery_Management:TP4056-42-ESOP8   # real pin numbers and types
 ```
 
 `--pins` is what a netlist actually needs: pin *numbers*, names, electrical
-types, the symbol's `default_footprint`, and its `footprint_filters` (which tell
-you which footprints the symbol is meant to pair with). Pin numbering is exactly
-where memory fails — the TP4056 has a 9th EPAD pin that is easy to forget, and
-getting a pin number wrong produces a board that looks fine and does not work.
+types, each pin's connection point, the symbol's `default_footprint`, and its
+`footprint_filters` (which tell you which footprints the symbol is meant to pair
+with). Pin numbering is exactly where memory fails — the TP4056 has a 9th EPAD
+pin that is easy to forget, and getting a pin number wrong produces a board that
+looks fine and does not work.
+
+A pad number is **not unique**, either: that EPAD is 8 pads all numbered `9`,
+and a USB-C shield is 4 pads all numbered `SH`. Anything that assigns a net by
+pad number has to assign it to all of them.
 
 Before writing any netlist, confirm the whole set at once:
 
@@ -74,6 +79,37 @@ kh drc --pcb <proj>                         # 5. confirm nothing broke
 Step 4 is the point of this harness. A placement script that runs without error
 can still be visibly wrong — overlapping courtyards, parts rotated 90° off,
 a filter laid out in the wrong order. Only the image catches that.
+
+## Schematic to board, with no GUI
+
+There is no schematic API (see below), so a schematic is a **file** you write.
+`kh sym --sexpr Lib:Name` hands back the raw symbol body for the file's
+`lib_symbols` block, and `kh sym --pins` gives the pin coordinates the wires
+have to land on. Library coordinates are y-up, the sheet is y-down, and
+connectivity is decided purely by coordinates — `docs/RECIPES.md` has the
+transform for all four rotations and the junction rule.
+
+From a schematic, the rest is headless:
+
+```bash
+kh erc --sch .                                   # electrical check
+kh sview --sch . --out /tmp/sch.png              # render the sheet -- then look
+kh netlist --sch . --out n.net                   # read it: are these the nets you meant?
+kh board-from-netlist --sch . --outline 20,20,38,26.5 \
+    --clearance 0.125 --min-drill 0.2            # -> .kicad_pcb, parts + nets
+kh place --pcb . --json placement.json           # place, without KiCad running
+kh view --pcb . --out /tmp/b.png                 # -> look
+kh drc --pcb . --severity all
+```
+
+`board-from-netlist` is the step KiCad itself does not expose headlessly:
+`kicad-cli pcb import` only reads foreign CAD, and pcbnew's netlist import is a
+GUI action. It reports `unmatched_pads` — a pin the netlist names that the
+footprint does not have — which is the symbol/footprint mismatch that otherwise
+surfaces much later as a mystery.
+
+**A clean ERC does not mean the circuit is right.** ERC checks pin types, not
+intent. Read the netlist and confirm the nets are the ones you meant.
 
 ## Seeing the board
 
@@ -160,12 +196,16 @@ project that already exists.
 
 ## What is not available
 
-- **No schematic editing.** kipy ships schematic wrapper classes, but the
+- **No schematic editing API.** kipy ships schematic wrapper classes, but the
   protobufs behind them are missing and its schematic command proto is empty, so
   `import kipy.schematic` fails and `sch` is always `None`. Do not spend time
   trying to make it work. Treat schematics as **files**: `kh netlist` for
-  connectivity, `kh erc` for problems, and edit `.kicad_sch` s-expressions as
-  text. `kh live` reports `schematic_api: false`.
+  connectivity, `kh erc` for problems, `kh sview` to look, and write/edit
+  `.kicad_sch` s-expressions as text. `kh live` reports `schematic_api: false`.
+- **The live layer needs an editor window, not just a running KiCad.** With only
+  the project manager open, the socket answers `ping` but every document request
+  comes back "no handler available". `kh live` reports `editor_open: false` and
+  exits non-zero; everything offline still works.
 - **No ratsnest in renders.** SVG export omits airwires, so you cannot see
   unrouted connections in an image. Use `kh drc` — the `unconnected` section
   lists them with coordinates.

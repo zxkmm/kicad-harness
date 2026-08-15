@@ -111,11 +111,58 @@ with Commit(board, "snap to grid"):
 ```bash
 kh netlist --out /tmp/n.net       # connectivity, s-expression
 kh erc --limit 10                 # what is wrong with it
+kh sview --out /tmp/sch.png       # render the sheet and look at it
 ```
 
-For structure, `.kicad_sch` is plain s-expression text — readable directly. For
-*editing* a schematic, use the live layer (`sch.create_items` / `update_items`);
-see `LIVE_API.md`.
+For structure, `.kicad_sch` is plain s-expression text — readable directly.
+
+There is **no schematic editing API** — kipy ships the wrappers but not the
+protobufs behind them, so `import kipy.schematic` fails outright and `sch` is
+always `None`. See `CAPABILITIES.md`. Edit `.kicad_sch` as text instead.
+
+## Author a schematic as text
+
+`kh sym --pins` gives each pin's connection point in symbol coordinates, and
+`kh sym --sexpr` gives the raw symbol body to embed in the file's `lib_symbols`
+block. That is everything needed to write a `.kicad_sch` from scratch.
+
+```bash
+kh sym --pins Device:R                 # -> pin 1 at (0, 3.81), pin 2 at (0, -3.81)
+kh sym --sexpr Device:R                # -> the (symbol "Device:R" ...) body
+```
+
+Two things to know, because neither is written down anywhere and both produce
+files that load fine and net up wrong:
+
+- **Library coordinates are y-up; the sheet is y-down.** A pin at symbol
+  `(x, y)` on an instance placed at `(X, Y)` with rotation 0 lands at
+  `(X + x, Y - y)`. Rotations fold that flip in, so 90 and 270 are not sign
+  swaps of one another: 90 -> `(-y, -x)`, 180 -> `(-x, y)`, 270 -> `(y, x)`.
+- **Connectivity is purely coordinates.** A wire end that misses a pin is a
+  separate net and nothing in the file says so. A wire ending on the *middle*
+  of another wire needs an explicit `(junction ...)`, or the two are merely
+  crossing.
+
+Verify with `kh erc`, then read the netlist to confirm the nets are the ones
+you meant — ERC passes happily on a circuit that is wired wrongly but legally.
+Then `kh sview` and look at it, because overlapping symbols are not an
+electrical error and only the picture shows them.
+
+## Netlist to board, headless
+
+```bash
+kh board-from-netlist --sch . --outline 20,20,38,26.5 \
+    --clearance 0.125 --min-drill 0.2      # parts + nets, on a scratch grid
+kh place --pcb . --json placement.json     # move them (no KiCad needed)
+kh view --pcb . --layers front --out /tmp/b.png
+kh drc --pcb . --severity all
+```
+
+`--clearance` / `--min-drill` matter more than they look: an empty board comes
+up with a 0.2 mm clearance and a 0.3 mm minimum hole, and stock KiCad
+footprints violate both — a USB-C receptacle's pads sit 0.15 mm apart and a
+thermal-via pattern drills 0.2 mm. Left at the defaults the board fails DRC on
+geometry the library itself shipped.
 
 ## Whole-board review pass
 

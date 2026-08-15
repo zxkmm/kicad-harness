@@ -97,6 +97,19 @@ def cmd_ls(a):
     emit([c.as_dict() for c in comps])
 
 
+def cmd_sview(a):
+    emit(
+        render.render_schematic(
+            sch=resolve_sch(a.sch),
+            out_png=a.out,
+            width_px=a.width,
+            background=a.background,
+            theme=a.theme,
+            drawing_sheet=a.drawing_sheet,
+        )
+    )
+
+
 def cmd_view(a):
     region = None
     if a.region:
@@ -138,12 +151,65 @@ def cmd_bom(a):
     emit(checks.bom(resolve_sch(a.sch), a.out, fields=a.fields))
 
 
+def cmd_board_from_netlist(a):
+    import tempfile
+
+    from . import board
+
+    netlist = a.netlist
+    tmpdir = None
+    if not netlist:
+        # No netlist given: export one from the schematic first, so the usual
+        # case is a single command rather than two.
+        tmpdir = tempfile.TemporaryDirectory()
+        netlist = os.path.join(tmpdir.name, "netlist.net")
+        checks.netlist(resolve_sch(a.sch), netlist)
+
+    outline = None
+    if a.outline:
+        try:
+            outline = tuple(float(v) for v in a.outline.split(","))
+        except ValueError:
+            raise SystemExit("--outline wants four numbers: x,y,w,h (mm)")
+        if len(outline) != 4:
+            raise SystemExit("--outline wants four numbers: x,y,w,h (mm)")
+
+    out = a.out
+    if not out:
+        sch = resolve_sch(a.sch)
+        out = os.path.splitext(sch)[0] + ".kicad_pcb"
+
+    project = a.project
+    if not project:
+        project = os.path.dirname(os.path.abspath(out))
+
+    rules = {
+        "clearance": a.clearance,
+        "track_width": a.track_width,
+        "min_clearance": a.clearance,
+        "min_through_drill": a.min_drill,
+    }
+    res = board.board_from_netlist(
+        netlist, out, project_dir=project, copper_layers=a.layers,
+        row_width=a.row_width, outline=outline,
+        rules={k: v for k, v in rules.items() if v is not None},
+        overwrite=a.overwrite,
+    )
+    if tmpdir:
+        tmpdir.cleanup()
+    emit(res)
+    if not res["ok"]:
+        sys.exit(1)
+
+
 def cmd_live(a):
     from . import live
 
     info = live.status()
     emit(info)
-    if not info.get("connected"):
+    # Non-zero unless the live layer is actually usable: a socket that answers
+    # ping but has no editor behind it cannot run `kh exec`.
+    if not (info.get("connected") and info.get("editor_open")):
         sys.exit(1)
 
 
@@ -151,6 +217,33 @@ def cmd_exec(a):
     from . import live
 
     emit(live.run_script(a.script, a.args))
+
+
+def cmd_place(a):
+    from . import board
+
+    moves = {}
+    if a.json:
+        with open(a.json) as fh:
+            moves.update({k: list(v) for k, v in json.load(fh).items()})
+    for item in a.set or []:
+        ref, _, rest = item.partition("=")
+        if not rest:
+            raise SystemExit(f"--set wants REF=x,y[,rot][,side], got {item!r}")
+        moves[ref.strip()] = [p.strip() for p in rest.split(",")]
+    if not moves:
+        raise SystemExit("nothing to place: pass --set or --json")
+    emit(board.place(resolve_pcb(a.pcb), moves))
+
+
+def cmd_outline(a):
+    from . import board
+
+    try:
+        x, y, w, h = (float(v) for v in a.rect.split(","))
+    except ValueError:
+        raise SystemExit("--rect wants four numbers: x,y,w,h (mm)")
+    emit(board.set_outline(resolve_pcb(a.pcb), x, y, w, h))
 
 
 def _index(a):
@@ -164,7 +257,9 @@ def _index(a):
 
 def cmd_sym(a):
     idx = _index(a)
-    if a.pins:
+    if a.sexpr:
+        emit(idx.symbol_sexpr(a.sexpr))
+    elif a.pins:
         emit(idx.symbol_detail(a.pins))
     elif a.query:
         emit(idx.search_symbols(a.query, a.limit))
@@ -241,6 +336,16 @@ def build_parser() -> argparse.ArgumentParser:
                    help="do not pad the region to a square")
     s.set_defaults(func=cmd_view)
 
+    s = sub.add_parser("sview", help="render a schematic sheet to PNG")
+    sch_arg(s)
+    s.add_argument("--out", default="schematic.png", help="output PNG path")
+    s.add_argument("--width", type=int, default=1600, help="output width in px")
+    s.add_argument("--background", default="white")
+    s.add_argument("--theme", help="KiCad color theme name")
+    s.add_argument("--drawing-sheet", action="store_true",
+                   help="include the title block and frame")
+    s.set_defaults(func=cmd_sview)
+
     s = sub.add_parser("drc", help="design rules check")
     board_arg(s)
     s.add_argument("--severity", default="error", choices=["all", "error", "warning"])
@@ -268,12 +373,46 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--fields")
     s.set_defaults(func=cmd_bom)
 
+    s = sub.add_parser("place", help="move footprints on a board file (no KiCad needed)")
+    board_arg(s)
+    s.add_argument("--set", action="append", metavar="REF=x,y[,rot][,side]",
+                   help="repeatable, e.g. --set U1=44,33,180")
+    s.add_argument("--json", help="JSON file of {ref: [x, y, rot, side]}")
+    s.set_defaults(func=cmd_place)
+
+    s = sub.add_parser("outline", help="set a rectangular Edge.Cuts board outline")
+    board_arg(s)
+    s.add_argument("--rect", required=True, metavar="x,y,w,h", help="in mm")
+    s.set_defaults(func=cmd_outline)
+
+    s = sub.add_parser("board-from-netlist",
+                       help="create a .kicad_pcb from a netlist, headless")
+    sch_arg(s)
+    s.add_argument("--netlist", help="netlist file (default: export it from --sch)")
+    s.add_argument("--out", help="output .kicad_pcb (default: alongside the schematic)")
+    s.add_argument("--project", help="project dir, for its local lib tables")
+    s.add_argument("--outline", help="rectangular Edge.Cuts outline: x,y,w,h in mm")
+    s.add_argument("--layers", type=int, default=2, help="copper layer count")
+    s.add_argument("--clearance", type=float,
+                   help="mm; stock 0.2 rejects USB-C pad pitch")
+    s.add_argument("--track-width", type=float, help="default track width, mm")
+    s.add_argument("--min-drill", type=float,
+                   help="mm; stock 0.3 rejects 0.2 mm thermal vias")
+    s.add_argument("--row-width", type=float, default=90.0,
+                   help="mm before the scratch placement grid wraps")
+    s.add_argument("--overwrite", action="store_true",
+                   help="replace an existing board, discarding its placement")
+    s.set_defaults(func=cmd_board_from_netlist)
+
     def proj_arg(sp):
         sp.add_argument("--project", help="project dir, to include its local lib tables")
 
     s = sub.add_parser("sym", help="search the user's symbol libraries")
     s.add_argument("query", nargs="?", help="omit to show library counts")
-    s.add_argument("--pins", metavar="LIB:NAME", help="full pin list for one symbol")
+    s.add_argument("--pins", metavar="LIB:NAME",
+                   help="full pin list for one symbol, with pin geometry")
+    s.add_argument("--sexpr", metavar="LIB:NAME",
+                   help="raw symbol definition, ready for a schematic's lib_symbols")
     s.add_argument("--limit", type=int, default=40)
     proj_arg(s)
     s.set_defaults(func=cmd_sym)
@@ -301,15 +440,31 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _exit(code: int):
+    """Leave without running interpreter finalization.
+
+    pcbnew's SWIG bindings print a block of "detected a memory leak of type
+    'PCB_SHAPE *', no destructor found" to stderr as the interpreter tears down,
+    for objects that were handed to the BOARD and are not leaked at all. It is
+    noise, but it is noise that reads like a failure and lands right after the
+    command's JSON. Nothing here needs finalization -- temporary directories are
+    already released by their context managers -- so flush and go.
+    """
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(code)
+
+
 def main(argv=None):
     args = build_parser().parse_args(argv)
     try:
         args.func(args)
-    except SystemExit:
-        raise
+    except SystemExit as e:
+        _exit(e.code if isinstance(e.code, int) else (0 if e.code is None else 1))
     except Exception as e:
         print(f"{type(e).__name__}: {e}", file=sys.stderr)
-        sys.exit(1)
+        _exit(1)
+    _exit(0)
 
 
 if __name__ == "__main__":

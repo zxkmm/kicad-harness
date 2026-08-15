@@ -81,6 +81,51 @@ def _rasterize(svg: str, png: str, width_px: int, background: str):
         raise RuntimeError(f"rsvg-convert failed:\n{r.stderr}")
 
 
+def render_schematic(
+    sch: str,
+    out_png: str,
+    width_px: int = 1600,
+    background: str = "white",
+    theme: Optional[str] = None,
+    drawing_sheet: bool = False,
+) -> dict:
+    """Render a schematic sheet to PNG.
+
+    A schematic authored as text is exactly as capable of being silently wrong
+    as a placement script -- symbols on top of each other, a label parked over
+    a part, two chains overlapping. ERC does not see any of that, because none
+    of it is an electrical error. Only the picture catches it.
+    """
+    _require("kicad-cli")
+    out_png = os.path.abspath(out_png)
+    os.makedirs(os.path.dirname(out_png) or ".", exist_ok=True)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        cmd = ["kicad-cli", "sch", "export", "svg", "--output", tmp,
+               "--no-background-color"]
+        if not drawing_sheet:
+            cmd.append("--exclude-drawing-sheet")
+        if theme:
+            cmd += ["--theme", theme]
+        cmd.append(sch)
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        svgs = sorted(f for f in os.listdir(tmp) if f.endswith(".svg"))
+        if r.returncode != 0 or not svgs:
+            raise RuntimeError(f"kicad-cli sch svg export failed:\n{r.stdout}\n{r.stderr}")
+        # One SVG per sheet; the root sheet is the one named after the file.
+        root = os.path.splitext(os.path.basename(sch))[0] + ".svg"
+        pick = root if root in svgs else svgs[0]
+        _rasterize(os.path.join(tmp, pick), out_png, width_px, background)
+        sheets = svgs
+
+    return {
+        "png": out_png,
+        "source": os.path.abspath(sch),
+        "width_px": width_px,
+        "sheets_exported": sheets,
+    }
+
+
 def render(
     pcb: str,
     out_png: str,

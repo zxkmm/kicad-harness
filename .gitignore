@@ -11,3 +11,6 @@ dist/
 *.net
 *.csv
 view.png
+
+# freerouting
+*freerouting*/

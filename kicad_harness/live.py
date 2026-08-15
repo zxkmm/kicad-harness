@@ -20,6 +20,15 @@ ENABLE_HINT = (
     "  3. Re-run. If it still fails, restart KiCad so the server binds its socket."
 )
 
+NO_EDITOR_HINT = (
+    "The API server is up and answering ping, but no editor window is open, so "
+    "there is nothing to talk to: document requests come back 'no handler "
+    "available'. The project manager alone does not serve them.\n"
+    "Open the board in the PCB editor (or the schematic in Eeschema) and re-run. "
+    "Everything that does not need a running editor -- kh sym / fp / validate, "
+    "view, drc, erc, netlist, board-from-netlist, place -- works regardless."
+)
+
 
 def _import_kipy():
     try:
@@ -67,12 +76,23 @@ def status() -> dict:
     info["connected"] = True
     info["kicad_version"] = str(kicad.get_version())
     info["api_version"] = str(kicad.get_api_version())
-    info["open_boards"] = [
-        d.board_filename for d in kicad.get_open_documents(DocumentType.DOCTYPE_PCB)
-    ]
-    info["open_schematics"] = [
-        d.board_filename for d in kicad.get_open_documents(DocumentType.DOCTYPE_SCHEMATIC)
-    ]
+
+    # Listing documents fails outright when KiCad is running with no editor
+    # window -- the request has no handler at all, which surfaces as an
+    # ApiError, not an empty list. Report that as the actionable state it is
+    # rather than letting it escape from a function documented not to raise.
+    def _docs(kind):
+        return [d.board_filename for d in kicad.get_open_documents(kind)]
+
+    try:
+        info["open_boards"] = _docs(DocumentType.DOCTYPE_PCB)
+        info["open_schematics"] = _docs(DocumentType.DOCTYPE_SCHEMATIC)
+        info["editor_open"] = True
+    except Exception as e:
+        info["editor_open"] = False
+        info["open_boards"] = []
+        info["open_schematics"] = []
+        info["error"] = f"{NO_EDITOR_HINT}\n\nunderlying error: {e}"
     # Documents are listed even when the schematic API itself is unusable.
     info["schematic_api"] = schematic_supported()
     return info
@@ -142,8 +162,12 @@ def run_script(path: str, argv: Optional[list[str]] = None) -> dict:
     sch = None
     try:
         board = kicad.get_board()
-    except Exception:
-        pass
+    except Exception as e:
+        # Distinguish "no board open" from "no editor at all". The second used
+        # to surface as `board is None` and then an AttributeError deep inside
+        # the user's script, which points nowhere near the cause.
+        if "no handler available" in str(e):
+            raise ConnectionError(f"{NO_EDITOR_HINT}\n\nunderlying error: {e}") from None
     try:
         sch = get_schematic(kicad)
     except Exception:
