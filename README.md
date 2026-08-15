@@ -15,7 +15,7 @@ which handles datasheet → footprint. This handles everything after that.
 <img width="3346" height="982" alt="image" src="https://github.com/user-attachments/assets/6a149f57-96b4-4861-a5f5-653ce11fe89c" />
 
 Use Claude Opus 5 in Claude Code, with [this prompt](https://gist.github.com/zxkmm/f82bf892a644cc1c30c1e2ab79ce8476);   
-Cost (Assume no subscribe plan): 350 input, 158.6k output, 22.9m cache read, 279.5k cache write ($18.22)  
+Cost (Assume no subscription plan): 350 input, 158.6k output, 22.9m cache read, 279.5k cache write ($18.22)  
 What it made good:   
 - Design is correct.  
 - DRC/ERC passed.  
