@@ -10,6 +10,19 @@ built-in console. This harness supplies both.
 Companion to [kicad-footprint-generate](https://github.com/zxkmm/kicad-footprint-generate),
 which handles datasheet → footprint. This handles everything after that.
 
+## Demos
+### TP4056 battery charge controller
+<img width="3346" height="982" alt="image" src="https://github.com/user-attachments/assets/6a149f57-96b4-4861-a5f5-653ce11fe89c" />
+Use Claude Opus 5 in Claude Code, with [this prompt](https://gist.github.com/zxkmm/f82bf892a644cc1c30c1e2ab79ce8476);   
+Cost (Assume no subscribe plan): 350 input, 158.6k output, 22.9m cache read, 279.5k cache write ($18.22)
+What it made good: 
+- Design is correct.
+- DRC/ERC passed.
+What it made bad:
+- Didn't add copper fill zone, all GND were wired, though usable.
+- Placement isn't good, though usable.
+**Get the project [Here](https://github.com/zxkmm/kicad-harness-demo-board-tp4056)**; The commit `5ca3f4d13f3e9c7d809f661c0eeaeb0bf86a3caf` is untouched project file that generate purely by harness.   
+
 ## Three layers
 
 | Layer | Needs | Gives you |
