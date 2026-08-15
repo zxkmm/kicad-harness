@@ -1,0 +1,2 @@
+JAVA_VERSION="25.0.3"
+MODULES="java.base java.datatransfer java.xml java.prefs java.desktop java.logging java.management java.net.http java.transaction.xa java.sql jdk.crypto.ec jdk.management"

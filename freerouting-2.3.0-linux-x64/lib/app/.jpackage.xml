@@ -1,0 +1,5 @@
+<?xml version="1.0" ?>
+<jpackage-state version="25.0.3" platform="linux">
+  <app-version>2.3.0</app-version>
+  <main-launcher>freerouting</main-launcher>
+  <main-class>app.freerouting.Freerouting</main-class></jpackage-state>

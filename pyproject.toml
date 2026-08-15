@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kicad-harness"
+version = "0.1.0"
+description = "Give an AI agent eyes and hands on a KiCad project"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["kicad-python>=0.7"]
+
+[project.scripts]
+kh = "kicad_harness.cli:main"
+
+[tool.setuptools]
+packages = ["kicad_harness"]
