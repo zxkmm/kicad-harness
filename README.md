@@ -16,14 +16,15 @@ which handles datasheet → footprint. This handles everything after that.
 
 Use Claude Opus 5 in Claude Code, with [this prompt](https://gist.github.com/zxkmm/f82bf892a644cc1c30c1e2ab79ce8476);   
 Cost (Assume no subscription plan): 350 input, 158.6k output, 22.9m cache read, 279.5k cache write ($18.22)  
-What it made good:   
+**What it made good:**   
 - Design is correct.  
-- DRC/ERC passed.  
-What it made bad:  
+- DRC/ERC passed.
+
+**What it made bad:**  
 - Didn't add copper fill zone, all GND were wired, though usable.  
 - Placement isn't good, though usable.
 
-**Get the project** [Here](https://github.com/zxkmm/kicad-harness-demo-board-tp4056);   
+**Get the demo project** [Here](https://github.com/zxkmm/kicad-harness-demo-board-tp4056);   
 The commit `5ca3f4d13f3e9c7d809f661c0eeaeb0bf86a3caf` is untouched project file that generate purely by harness.    
 
 ## Three layers
