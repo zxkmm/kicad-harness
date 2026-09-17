@@ -96,6 +96,48 @@ with Commit(board, "reposition"):
     board.update_items(fp)
 ```
 
+### Editing footprint fields
+
+`reference_field`, `value_field`, `description_field` … are `Field` objects, not
+strings. The text lives at `.text.value`, and the field also carries `field_id`,
+`name`, `layer` and `visible`.
+
+```python
+with Commit(board, "annotate placement priority"):
+    batch = []
+    for ref, text in notes.items():
+        f = fps[ref]
+        f.description_field.text.value = text
+        batch.append(f)
+    board.update_items(batch)       # takes a list -- no need to loop
+```
+
+`description_field` is `field_id` 5 and lands in the footprint's per-instance
+`(property "Description" ...)` in the `.kicad_pcb`. That is **not** the
+`(descr ...)` line a few lines above it: `descr` is the library footprint's own
+blurb and is restored by "Update Footprints from Library", while the property is
+per-instance and is what KiCad shows in the Properties panel. Do not confuse them.
+
+Measured on KiCad 10.0.6: pushing 132 footprints through `update_items` this way
+is **not** lossy at the footprint level. Pads, `fp_line`, `fp_poly`, `fp_text`,
+`property` and the `model` reference all survived — the touched footprints came
+out structurally identical to untouched peers built from the same library
+footprint. This is a different code path from `board.save()`; the user still
+presses Ctrl+S.
+
+**A field's live value can be stale relative to the file.** Observed on a real
+board: the `.kicad_pcb` held the user's custom Description strings, but the API
+returned the stock library text (`"Unpolarized capacitor"`, `"Resistor"`) for
+those same footprints — while `position` matched the file exactly, so the board
+was otherwise current. "Update PCB from Schematic" resets footprint fields from
+the schematic symbol, and until the next save the file and the editor disagree.
+
+Two consequences, both of which cost real work if missed:
+
+- Read the `.kicad_pcb` as well as the API before concluding a field is unset.
+- Saying "press Ctrl+S" propagates the *editor's* version and silently discards
+  whatever exists only in the file. Capture the file's text first, then rewrite it.
+
 ## Schematic — not available
 
 `sch` is `None`, and `get_schematic()` raises. kipy 0.7.1 contains schematic
