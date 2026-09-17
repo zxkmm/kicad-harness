@@ -218,7 +218,38 @@ Observed on KiCad 10.0.6: patterns containing `+` and `-` (`USB_D+`) match fine;
 priority 0 correctly beats `Default` at 2147483647.
 
 If the resolver returns the class you wanted but routing still uses the old
-width, the override is in the **editor session, not the project**:
+width, **check the DRC floor first — it is the most common cause and the
+easiest to miss**:
+
+```bash
+python3 -c "import json;print(json.load(open('x.kicad_pro'))['board']['design_settings']['rules'])"
+```
+
+`rules.min_track_width` (Board Setup -> Design Rules -> Constraints) is a hard
+floor: KiCad resolves the netclass width and then **clamps it up** to this
+value. A netclass asking for 0.165 on a board with `min_track_width: 0.2` lays
+0.2, silently, forever — re-routing never helps. Observed on 10.0.6.
+
+The tell is an **asymmetry between width and gap**: there is no minimum-gap
+constraint, so on a differential pair the netclass `diff_pair_gap` comes out
+exactly right while the width is wrong. If gap is correct and width is not,
+stop looking at the UI and read `rules.min_track_width`. Confirm by measuring
+what was actually laid down:
+
+```python
+pitch = centre_to_centre_of_the_two_nets   # from Track start/end
+gap   = pitch - width                      # == netclass diff_pair_gap?
+```
+
+The provenance labels KiCad itself uses are greppable, and enumerate every
+source a width can come from:
+
+```bash
+strings -n 4 /usr/bin/_pcbnew.kiface | grep -A3 "board minimum track width"
+# -> board minimum clearance / board minimum track width / existing track / netclass '%s'
+```
+
+Only once the DRC floor is ruled out is the override in the **editor session**:
 
 - `auto_track_width: true` in `<proj>.kicad_prl` makes the router inherit the
   width of the object it starts from, ignoring the netclass entirely.
