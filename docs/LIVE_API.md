@@ -118,12 +118,47 @@ with Commit(board, "annotate placement priority"):
 blurb and is restored by "Update Footprints from Library", while the property is
 per-instance and is what KiCad shows in the Properties panel. Do not confuse them.
 
-Measured on KiCad 10.0.6: pushing 132 footprints through `update_items` this way
-is **not** lossy at the footprint level. Pads, `fp_line`, `fp_poly`, `fp_text`,
-`property` and the `model` reference all survived — the touched footprints came
-out structurally identical to untouched peers built from the same library
-footprint. This is a different code path from `board.save()`; the user still
-presses Ctrl+S.
+**`update_items` on a footprint is lossy too — not just `board.save()`.**
+Measured on KiCad 10.0.6: pushing 132 footprints through `update_items` to set
+one field silently **deleted the `(units ...)` block from every one of them**.
+The file went from 157 blocks to 25; the 132 touched footprints each lost
+
+```
+(units
+    (unit
+        (name "A")
+        (pins "1" "2")
+    )
+)
+```
+
+which sits between `(sheetfile ...)` and `(attr ...)` and carries the
+symbol-unit-to-pad mapping synced from the schematic. Nothing else changed —
+pads, `fp_line`, `fp_poly`, `fp_text`, `property` and the `model` reference all
+survived, and the diff was exactly the 131×6 removed lines. No error, no
+warning, and the resulting file is well-formed and loads fine.
+
+So the `board.save()` warning generalises: **anything the API model does not
+represent is dropped from whatever you push through it**, at whatever
+granularity you push. Before a bulk `update_items`, snapshot the footprints you
+are about to touch, and diff after the save:
+
+```bash
+unzip -p <project>-backups/<newest>.zip <project>.kicad_pcb > /tmp/base.kicad_pcb
+diff <(grep -v '(property "Description"' /tmp/base.kicad_pcb) \
+     <(grep -v '(property "Description"' <project>.kicad_pcb)
+```
+
+Counting element types is **not** enough to prove no damage — a profile of
+`pad`/`fp_line`/`property`/`model` counts looked identical across touched and
+untouched footprints while `units` was quietly missing from all of them. Diff the
+text.
+
+Repair, if it already happened: KiCad writes a zip into `<project>-backups/` on
+every save, so the pre-damage file is usually still there. Re-insert each
+footprint's block verbatim before its `(attr ` line, then have the user
+**File → Revert** in the PCB editor — the editor still holds the damaged board in
+memory and will re-save the damage otherwise.
 
 **A field's live value can be stale relative to the file.** Observed on a real
 board: the `.kicad_pcb` held the user's custom Description strings, but the API

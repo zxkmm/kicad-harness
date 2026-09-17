@@ -184,6 +184,14 @@ carry are dropped on the way out — observed on KiCad 10.0.5 to delete every
 requested went unwritten and KiCad became unreachable straight afterwards. The
 loss is silent: no error, and the file is well-formed when it lands.
 
+**`update_items` is lossy in the same way**, so Ctrl+S does not make you safe —
+it only moves the question to *what you pushed*. Setting one field on 132
+footprints deleted the `(units ...)` block from all 132 (KiCad 10.0.6). Push as
+few items as the job needs, and prove no damage by **diffing the text** against
+the newest `<project>-backups/` zip — counting pads and graphics per footprint
+looks clean while whole blocks are missing. Details and the repair procedure:
+[docs/LIVE_API.md](docs/LIVE_API.md#editing-footprint-fields).
+
 Ask the user to press Ctrl+S instead. If you did call it, check immediately:
 
 ```bash
