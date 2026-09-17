@@ -227,6 +227,23 @@ width, the override is in the **editor session, not the project**:
   "use netclass width".
 
 Neither is reachable over the API — the user has to toggle them in the GUI.
+Locations, confirmed against `~/.config/kicad/10.0/toolbars/pcbnew-toolbars.json`
+on 10.0.6: both live in the **TOP_AUX** toolbar, `control.PCBTrackWidth`
+(the dropdown) followed immediately by `pcbnew.EditorControl.autoTrackWidth`
+(the toggle). The toggle ships with **no default hotkey**.
+
+Read that JSON rather than describing toolbars from memory — KiCad 9+ toolbars
+are user-customisable, so positions are per-install. The action ids and their
+labels are greppable out of the binary:
+
+```bash
+strings -n 4 /usr/bin/_pcbnew.kiface | grep -i -A2 "autoTrackWidth"
+```
+
+Note the exact scope of autoTrackWidth: *"When routing from an existing track
+use its width instead of the current width setting."* On a net with **no
+existing segments** it does not apply, so it cannot explain a wrong width on a
+never-routed net — check the dropdown before blaming it.
 
 Also worth saying out loud: `diff_pair_gap` is applied *only* by the
 differential pair router (Route → Differential Pair). Drawing the two nets with
