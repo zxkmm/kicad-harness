@@ -196,3 +196,39 @@ kh erc --severity all --limit 5
 
 Read both images, then the two reports. The images catch placement and spacing
 problems; the reports catch everything geometric and electrical.
+
+## "My netclass isn't applying" — resolve it the way KiCad does
+
+When a user reports that routing uses the wrong width, do **not** reason about
+whether the `netclass_patterns` in `.kicad_pro` *should* match. Ask the running
+KiCad what it actually resolved:
+
+```python
+nets = {n.name: n for n in board.get_nets()}
+targets = [nets[k] for k in ("USB_D+", "USB_D-")]
+for net, nc in board.get_netclass_for_nets(targets).items():
+    print(net.name, nc.name, nc.track_width, nc.diff_pair_track_width, nc.diff_pair_gap)
+```
+
+`board.get_netclass_for_nets(list_of_Net)` returns `{Net: NetClass}` and is the
+same resolver the router uses, so it settles pattern-matching questions
+outright. Widths come back in **nanometres**.
+
+Observed on KiCad 10.0.6: patterns containing `+` and `-` (`USB_D+`) match fine;
+priority 0 correctly beats `Default` at 2147483647.
+
+If the resolver returns the class you wanted but routing still uses the old
+width, the override is in the **editor session, not the project**:
+
+- `auto_track_width: true` in `<proj>.kicad_prl` makes the router inherit the
+  width of the object it starts from, ignoring the netclass entirely.
+- the toolbar track-width dropdown may be pinned to an explicit value; with
+  `board.design_settings.track_widths == []` the only correct setting is
+  "use netclass width".
+
+Neither is reachable over the API — the user has to toggle them in the GUI.
+
+Also worth saying out loud: `diff_pair_gap` is applied *only* by the
+differential pair router (Route → Differential Pair). Drawing the two nets with
+the single-track router picks up `track_width` but leaves the gap — and so the
+differential impedance — to whatever the user happens to draw.
