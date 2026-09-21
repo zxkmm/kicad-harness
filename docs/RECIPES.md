@@ -99,6 +99,58 @@ Verify with:
 kh view --refs R1,R2,R5,R6,R7,R13,R14 --margin 2 --out /tmp/pi_check.png
 ```
 
+## Bridge touching pads with copper shapes (eliminate V-gaps and satisfy DRC)
+
+When surface-mount pads on the same net are placed touching pad-to-pad (e.g. in
+zero-gap series chains or vertically stacked shunt arms):
+1. The footprint rounded corners create a tiny notch or "V-gap" at the contact line.
+2. KiCad DRC will flag the pads as unconnected unless a copper track or shape
+   physically joins them.
+
+You can bridge all touching pad pairs automatically by generating filled
+`pcbnew.PCB_SHAPE` copper rectangles assigned to the common net.
+
+See `examples/bridge_touching_pads.py`:
+
+```python
+# Detect touching pads and add copper rectangular bridges:
+TOL = 1000  # 1 µm touch tolerance (nm)
+pads = [p for p in b.GetPads() if p.IsOnLayer(pcbnew.F_Cu) and p.GetNetCode() > 0]
+for i, a in enumerate(pads):
+    for c in pads[i+1:]:
+        if a.GetNetCode() != c.GetNetCode() or a.GetParent() == c.GetParent():
+            continue
+        ba, bc = a.GetBoundingBox(), c.GetBoundingBox()
+        ba2 = pcbnew.BOX2I(ba.GetPosition(), ba.GetSize()); ba2.Inflate(TOL)
+        if not ba2.Intersects(bc):
+            continue
+        pa, pc = a.GetPosition(), c.GetPosition()
+        if abs(pa.x - pc.x) < abs(pa.y - pc.y):   # stacked vertically
+            x1, x2 = max(ba.GetLeft(), bc.GetLeft()), min(ba.GetRight(), bc.GetRight())
+            y1, y2 = pa.y, pc.y
+        else:                                      # side by side
+            y1, y2 = max(ba.GetTop(), bc.GetTop()), min(ba.GetBottom(), bc.GetBottom())
+            x1, x2 = pa.x, pc.x
+        s = pcbnew.PCB_SHAPE(b)
+        s.SetShape(pcbnew.SHAPE_T_RECT)
+        s.SetStart(pcbnew.VECTOR2I(x1, y1))
+        s.SetEnd(pcbnew.VECTOR2I(x2, y2))
+        s.SetFilled(True)
+        s.SetWidth(0)
+        s.SetLayer(pcbnew.F_Cu)
+        s.SetNet(a.GetNet())
+        b.Add(s)
+```
+
+Run in KiCad GUI Python Scripting Console:
+```python
+exec(open("examples/bridge_touching_pads.py").read())
+```
+Or run headless from the terminal:
+```bash
+python3 examples/bridge_touching_pads.py --pcb .
+```
+
 ## Find where a subcircuit currently lives
 
 ```bash
