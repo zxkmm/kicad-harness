@@ -61,6 +61,40 @@ Read the PNG. Check that series parts are collinear, shunts alternate below,
 nothing overlaps, and rotations are what you intended. Then check DRC for new
 courtyard violations.
 
+## Place a pi-attenuator resistor ladder (exact pad-edge neck gap)
+
+Pi-attenuators in RF signal paths require precise spacing and orientation:
+- **Neck clearance is pad-edge to pad-edge**, not component center-to-center.
+  When an RF layout specifies e.g. a "0.8 mm neck", this is the gap between the
+  transverse shunt pad edge and the inline series pad edge.
+  For 0805 (pads $1.025 \times 1.4\text{ mm}$ centered at $\pm 0.9125\text{ mm}$):
+  - A horizontal series resistor (0°) extends $\pm 1.425\text{ mm}$ along X ($0.9125 + 0.5125$).
+  - A vertical shunt resistor ($\pm 90^\circ$) has its $1.4\text{ mm}$ width along X, extending $\pm 0.7\text{ mm}$.
+  - Shunt-to-series center-to-center pitch for a $0.8\text{ mm}$ neck is:
+    $$0.8 + 0.700 + 1.425 = \mathbf{2.925\text{ mm}}$$
+- **Stacked vertical shunt arms** (` | -|- | `): High-attenuation stages often place
+  two (or more) resistors in series to GND in each shunt arm to meet voltage/power
+  ratings. The inner resistor touches the signal line at $Y_{\text{signal}} \pm 1.425\text{ mm}$,
+  and subsequent resistors stack vertically touching pad-to-pad (pitch = $2.85\text{ mm}$ for 0805).
+- **Zero-gap inline series chains**: Adjacent series resistors butt pad-to-pad
+  ($\text{pitch} = 2.85\text{ mm}$ for 0805).
+- **Alternating rotations prevent crossed traces**:
+  - Series resistors alternate $0^\circ / 180^\circ$ so that pin 2 meets pin 2 and pin 1 meets pin 1.
+  - Shunt arms alternate $90^\circ / -90^\circ$ matching internal net connections.
+
+See `examples/place_pi_attenuator.py` for the full script:
+
+```python
+# Shunt-to-series pitch with exact 0.8mm pad-edge neck:
+NECK_CC = 0.8 + 0.7 + 1.425   # 2.925 mm (0805)
+SERIES_CC = 2 * 1.425          # 2.850 mm (0805 touching pad-to-pad)
+```
+
+Verify with:
+```bash
+kh view --refs R1,R2,R5,R6,R7,R13,R14 --margin 2 --out /tmp/pi_check.png
+```
+
 ## Find where a subcircuit currently lives
 
 ```bash
