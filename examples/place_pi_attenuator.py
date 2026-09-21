@@ -71,14 +71,16 @@ def layout_ladder(stages: list[dict], x0: float, y0: float, geom: dict) -> dict[
         arm_up = node.get("shunt_up", [])
         for idx, r in enumerate(arm_up):
             y = y0 - geom["shunt_y"] - idx * geom["shunt_stack_pitch"]
-            rot = -90 if (idx % 2 == 0) else 90
+            # In KiCad (+Y down), rot=90 puts Pad 1 at +Y (towards signal line)
+            rot = 90 if (idx % 2 == 0) else -90
             placement[r] = [round(jx, 4), round(y, 4), rot]
 
         # 2. Place vertical shunt arm DOWN (+Y direction)
         arm_down = node.get("shunt_down", [])
         for idx, r in enumerate(arm_down):
             y = y0 + geom["shunt_y"] + idx * geom["shunt_stack_pitch"]
-            rot = 90 if (idx % 2 == 0) else -90
+            # In KiCad (+Y down), rot=-90 puts Pad 1 at -Y (towards signal line)
+            rot = -90 if (idx % 2 == 0) else 90
             placement[r] = [round(jx, 4), round(y, 4), rot]
 
         # 3. Place horizontal series chain to next junction

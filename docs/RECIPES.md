@@ -80,7 +80,11 @@ Pi-attenuators in RF signal paths require precise spacing and orientation:
   ($\text{pitch} = 2.85\text{ mm}$ for 0805).
 - **Alternating rotations prevent crossed traces**:
   - Series resistors alternate $0^\circ / 180^\circ$ so that pin 2 meets pin 2 and pin 1 meets pin 1.
-  - Shunt arms alternate $90^\circ / -90^\circ$ matching internal net connections.
+  - Shunt arms orientation in KiCad (+Y downwards):
+    - In KiCad screen space, a $+90^\circ$ rotation is clockwise: Pad 1 (initially at $-X$) rotates to $+Y$ (downwards).
+    - For an arm extending UP ($Y < Y_{\text{signal}}$), Pad 1 faces the signal line ($+Y$) at $\mathbf{rot = 90^\circ}$.
+    - For an arm extending DOWN ($Y > Y_{\text{signal}}$), Pad 1 faces the signal line ($-Y$) at $\mathbf{rot = -90^\circ}$ (or $270^\circ$).
+    - Stacked multi-element arms alternate rotations so adjacent pads match pin numbers and touch without crossing traces.
 
 See `examples/place_pi_attenuator.py` for the full script:
 
