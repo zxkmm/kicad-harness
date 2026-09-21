@@ -191,3 +191,8 @@ Fast enough to sit inside an edit → render → look → fix loop.
 - **`run_action()` is explicitly unstable.** KiCad does not guarantee action
   names across versions. Fine for a nudge like refreshing the view, not
   something to build on.
+- **Python 3.14 drops `SwigPyIterator.next()` fallback.** KiCad's bundled SWIG wrapper
+  implements container `__iter__` using `it.next()`. Python 3.14 enforces `__next__()`
+  strictly, raising `AttributeError: 'SwigPyIterator' object has no attribute 'next'`
+  when iterating over `board.GetTracks()`. `kicad_harness.geom` aliases `next = __next__`
+  on `pcbnew.SwigPyIterator` on import to maintain compatibility.

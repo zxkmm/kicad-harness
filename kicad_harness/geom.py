@@ -30,6 +30,8 @@ def _quiet():
 
 with _quiet():
     import pcbnew  # noqa: E402
+    if hasattr(pcbnew, "SwigPyIterator") and not hasattr(pcbnew.SwigPyIterator, "next"):
+        pcbnew.SwigPyIterator.next = pcbnew.SwigPyIterator.__next__
 
 
 def _mm(v) -> float:
