@@ -327,11 +327,16 @@ existing class dict, change `name`, the widths and the colours, then append
 `json.dumps(d, indent=2) + "\n"`, which reproduces KiCad's own formatting byte
 for byte, so the diff shows only your additions.
 
-KiCad reads `.kicad_pro` only when the project is opened, so the user has to
-close and reopen the project. If they change Board Setup first, KiCad
-overwrites your edit. A plain board save seems not to rewrite it: on one
-project the `.pcb` mtime was 17:33 and the `.pro` mtime was 10:15. After the
-reopen, confirm with `get_netclass_for_nets` (below).
+**Close KiCad entirely before you edit the file, and have the user reopen it
+afterwards.** While the project is open, KiCad keeps its own copy of the
+settings in memory and writes that copy back out whole. On KiCad 10.0.6, an
+edit made with the project open was silently overwritten about 5 minutes later
+during normal editing (a save around 17:45; the `.pro` mtime came about 1 minute
+before the board's). The file ended up byte-identical to its state before the
+edit. An earlier observation that a board save leaves `.pro` alone does not
+hold up, so don't count on it. The tell that the project is still open is
+`~<proj>.kicad_pro.lck`. After the reopen, confirm with
+`get_netclass_for_nets` (below).
 
 A netclass does not change tracks that are already routed. List the widths
 already on the nets and report any that are off.
