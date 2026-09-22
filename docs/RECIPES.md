@@ -316,6 +316,26 @@ kh erc --severity all --limit 5
 Read both images, then the two reports. The images catch placement and spacing
 problems; the reports catch everything geometric and electrical.
 
+## Adding a netclass — it is a `.kicad_pro` edit, not an API call
+
+Net-to-class assignment (`net_settings.netclass_patterns`) cannot be set over
+the API. The `SetNetClasses` proto defines classes only: its `NetClass`
+message has no pattern field, and kipy's `Project` has `get_net_classes` but
+no setter (kipy bundled with KiCad 10.0.6). So edit the JSON directly: copy an
+existing class dict, change `name`, the widths and the colours, then append
+`{"netclass": ..., "pattern": ...}` entries. Write it back with
+`json.dumps(d, indent=2) + "\n"`, which reproduces KiCad's own formatting byte
+for byte, so the diff shows only your additions.
+
+KiCad reads `.kicad_pro` only when the project is opened, so the user has to
+close and reopen the project. If they change Board Setup first, KiCad
+overwrites your edit. A plain board save seems not to rewrite it: on one
+project the `.pcb` mtime was 17:33 and the `.pro` mtime was 10:15. After the
+reopen, confirm with `get_netclass_for_nets` (below).
+
+A netclass does not change tracks that are already routed. List the widths
+already on the nets and report any that are off.
+
 ## "My netclass isn't applying" — resolve it the way KiCad does
 
 When a user reports that routing uses the wrong width, do **not** reason about
