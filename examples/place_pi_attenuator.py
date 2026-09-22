@@ -14,7 +14,17 @@ Features:
        |
 - Handles arbitrary length series chains (touching pad-to-pad, 0 mm gap)
 - Exact pad-edge-to-pad-edge neck spacing (e.g. 0.8 mm) between series and shunt pads
-- Alternates 0°/180° and 90°/-90° rotations to match pin connections and prevent track crossings.
+
+CAUTION -- rotation is index parity, not net-aware:
+This demo alternates 0deg/180deg (series) and 90deg/-90deg (shunt) purely by
+position in the input list (idx % 2). That prevents touching pads from
+colliding, but it does NOT know which pad number is actually wired to which
+net, so on a real netlist it can place a footprint rotated backwards (pad 1
+landing away from the signal line instead of toward it) -- geometrically
+tidy, electrically wrong, and easy to miss until you check continuity.
+For a real board, derive rotation from actual pad-net connectivity instead
+(rot = 90 if pad1_net == incoming_signal_net else -90); see "Net-aware
+shunt/series rotation" in docs/RECIPES.md for the worked pattern.
 """
 
 from __future__ import annotations
@@ -32,7 +42,11 @@ def get_geometry(pad_w: float = 1.025, pad_h: float = 1.4, pad_center: float = 0
     """Calculate pitch and offsets for SMD chip resistors.
 
     neck_gap: pad-edge to pad-edge distance between horizontal series pad
-              and vertical shunt pad.
+              and vertical shunt pad. Applies ONLY to that horizontal (X)
+              spacing -- it does not touch the shunt's own vertical offset
+              from the signal line (see shunt_y below), so two ladders built
+              with different neck_gap values still place their shunts at the
+              identical Y offset from the junction.
     series_gap: pad-edge to pad-edge distance between adjacent series pads.
     """
     pad_x_half = pad_w / 2
@@ -42,6 +56,9 @@ def get_geometry(pad_w: float = 1.025, pad_h: float = 1.4, pad_center: float = 0
 
     neck_cc = neck_gap + shunt_pad_x + series_pad_outer
     series_cc = series_gap + 2 * series_pad_outer
+    # Deliberately independent of neck_gap: this places the shunt's near pad
+    # edge flush against the junction (0 mm gap), a fixed pad-touching offset,
+    # not a "neck" that is meant to scale with neck_gap.
     shunt_y = pad_center + pad_x_half
     shunt_stack_pitch = 2 * (pad_center + pad_x_half)
 

@@ -194,5 +194,20 @@ Fast enough to sit inside an edit → render → look → fix loop.
 - **Python 3.14 drops `SwigPyIterator.next()` fallback.** KiCad's bundled SWIG wrapper
   implements container `__iter__` using `it.next()`. Python 3.14 enforces `__next__()`
   strictly, raising `AttributeError: 'SwigPyIterator' object has no attribute 'next'`
-  when iterating over `board.GetTracks()`. `kicad_harness.geom` aliases `next = __next__`
-  on `pcbnew.SwigPyIterator` on import to maintain compatibility.
+  when you iterate a container -- `for t in board.GetTracks():`, `for fp in board.Tracks():`,
+  same failure on any `BOARD` container. This bites `GetFootprints()`-style calls too
+  wherever they build the list via `for x in Container():` under the hood; `GetFootprints()`
+  itself is safe (it's a direct list typemap, not an iterator).
+  `kicad_harness.geom` patches `pcbnew.SwigPyIterator.next = __next__` on import, but that
+  patch only takes effect if your script actually imports through the harness
+  (`from kicad_harness.geom import pcbnew`) -- and `kicad_harness` is only on `sys.path`
+  inside the `kh` venv, so a **standalone** script (like the `import pcbnew` example just
+  above) will still hit this even though the harness "handles" it. Either import through
+  the harness, or carry the two-line patch yourself:
+  ```python
+  import pcbnew
+  if hasattr(pcbnew, "SwigPyIterator") and not hasattr(pcbnew.SwigPyIterator, "next"):
+      pcbnew.SwigPyIterator.next = pcbnew.SwigPyIterator.__next__
+  ```
+  Or sidestep it entirely: index the container instead of iterating —
+  `tracks = board.Tracks(); [tracks[i] for i in range(len(tracks))]` needs no patch.

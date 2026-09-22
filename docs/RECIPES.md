@@ -99,6 +99,35 @@ Verify with:
 kh view --refs R1,R2,R5,R6,R7,R13,R14 --margin 2 --out /tmp/pi_check.png
 ```
 
+### Net-aware shunt/series rotation (don't blindly alternate by index)
+
+The alternation rule above (`idx % 2`) only prevents footprints from visually
+overlapping. It says nothing about which pad number ends up wired to which
+net, because it never looks at the netlist. On a real board this can place a
+footprint rotated backwards -- pad 1 landing away from the signal line -- which
+still renders as a tidy, evenly-spaced ladder and only shows up as a routing
+or continuity problem later.
+
+Confirmed working on a real multi-stage attenuator board: derive rotation from
+actual pad-net connectivity instead, tracking which net is "the signal you
+arrived on" as you walk each arm outward from the junction:
+
+```python
+# r_nets[ref] = (pad1_net, pad2_net), from the netlist (see "Netlist to board,
+# headless" below, or parse the .net file directly)
+curr_sig_net = junction_net
+for idx, r in enumerate(arm):                  # arm = shunt resistors, inner to outer
+    p1_net, p2_net = r_nets[r]
+    rot = 90 if p1_net == curr_sig_net else -90    # arm extending UP; -90/90 swapped for DOWN
+    place(r, x, y, rot)
+    curr_sig_net = p2_net if p1_net == curr_sig_net else p1_net   # advance to the far net
+```
+
+Same idea for series resistors: `rot = 0 if p1_net == curr_sig_net else 180`.
+This self-corrects regardless of how many resistors are stacked, whether a
+stage is skipped, or which direction the ladder is walked in -- unlike index
+parity, it can't drift out of sync with the actual circuit.
+
 ## Bridge touching pads with copper shapes (eliminate V-gaps and satisfy DRC)
 
 When surface-mount pads on the same net are placed touching pad-to-pad (e.g. in
