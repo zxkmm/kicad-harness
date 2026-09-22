@@ -338,6 +338,15 @@ hold up, so don't count on it. The tell that the project is still open is
 `~<proj>.kicad_pro.lck`. After the reopen, confirm with
 `get_netclass_for_nets` (below).
 
+With KiCad still closed, you can check it offline with the system `pcbnew`
+module. It reads the `.kicad_pro` sitting next to the board and does not write
+it back. Use `GetNetClassName()`: on 10.0.6, `GetNetClass()` returns a raw
+SwigPyObject that has no methods.
+
+```bash
+python3 -c "import pcbnew; b=pcbnew.LoadBoard('x.kicad_pcb'); print(b.FindNet('TUNER_RF').GetNetClassName())"
+```
+
 A netclass does not change tracks that are already routed. List the widths
 already on the nets and report any that are off.
 
