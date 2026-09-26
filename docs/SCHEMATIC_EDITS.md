@@ -165,6 +165,21 @@ label on the free end. That keeps the label out of the way of the parts. Use
 rotation 0 (`justify left`, text runs right) or 180 (`justify right`, text runs
 left) — those are the two forms you can copy verbatim from an existing label.
 
+## Netclass patterns match auto-generated net names
+
+Projects often put RF or diff-pair nets into a netclass by listing their names
+under `net_settings.netclass_patterns` in the `.kicad_pro`, **including
+auto-generated ones** like `Net-(J5-In)`. Insert a part into such a net and its
+two halves get *new* auto names. The old pattern then matches only the stub
+that kept the original driver, and the rest falls back to `Default`: wrong
+track width on the board, and no error anywhere.
+
+After any edit that splits a net, compare the `(class ...)` of every net
+against the baseline netlist. Add patterns for the new names by inserting text
+into the `.kicad_pro`; don't `json.dump` it, which reformats the whole file.
+The schematic render also shows it: netclass-coloured wires turn back to
+default green on exactly the new segments.
+
 ## The netlist does not carry DNP
 
 `kh netlist` (kicadsexpr, via `kicad-cli`) has no `dnp` field. Asserting "R6 and
