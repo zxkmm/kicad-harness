@@ -211,3 +211,24 @@ Fast enough to sit inside an edit → render → look → fix loop.
   ```
   Or sidestep it entirely: index the container instead of iterating —
   `tracks = board.Tracks(); [tracks[i] for i in range(len(tracks))]` needs no patch.
+  Indexing hands back a `PCB_TRACK` proxy for **every** item, vias and arcs
+  included: `GetClass()` says `PCB_VIA`, but `GetWidth(pcbnew.F_Cu)` then fails
+  with "takes 1 positional argument". Call `tracks[i].Cast()` first.
+- **SWIG `LoadBoard` → `Save` is lossless, unlike the IPC save.** Measured on KiCad
+  10.0.6, 171-footprint 4-layer board: load-and-save with no edits produced a
+  byte-identical file (`diff` empty), and after adding ~100 tracks, ~40 vias and
+  2 zones the counts of `gr_*`, footprints and `(units` blocks were unchanged.
+  So for bulk routing on a board that is *not* open in the editor, a script that
+  loads a pristine copy, adds `PCB_TRACK`/`PCB_VIA`/`ZONE` and `Save()`s is the
+  safe path. Rebuild from the pristine copy each iteration, so the script stays
+  idempotent.
+- **Zones fill headlessly:** `kicad-cli pcb drc --refill-zones --save-board` fills
+  and writes them back. Keep the `.kicad_pro` next to the board copy (same stem),
+  or the netclasses are missing and DRC reports false `track_width` errors on
+  every netclass track. A scratch copy gives stale fills unless you refill, and
+  then new parts show up as bogus `solder_mask_bridge` against the old pour.
+  Diff the violations against a baseline run by (type, item descriptions). The
+  absolute count on a real board is mostly pre-existing silk noise.
+- **`lib_footprint_mismatch` from rotation alone.** `Diode_SMD:D_SOD-123F` that
+  matches the library at 90°/270° is flagged as mismatched at 0° and 180°, with no
+  other change (10.0.6). It is a rounding artefact, not a modified footprint.
