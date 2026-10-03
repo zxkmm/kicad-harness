@@ -146,7 +146,7 @@ def cmd_view(a):
 
 def cmd_drc(a):
     emit(checks.drc(resolve_pcb(a.pcb), severity=a.severity, limit=a.limit,
-                    all_track_errors=a.all_track_errors))
+                    all_track_errors=a.all_track_errors, refill=a.refill))
 
 
 def cmd_erc(a):
@@ -368,6 +368,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--severity", default="error", choices=["all", "error", "warning"])
     s.add_argument("--limit", type=int, default=5, help="samples per violation type")
     s.add_argument("--all-track-errors", action="store_true")
+    s.add_argument("--refill", action="store_true",
+                   help="refill zones first (on a temp copy); use after any headless edit")
     s.set_defaults(func=cmd_drc)
 
     s = sub.add_parser("erc", help="electrical rules check")

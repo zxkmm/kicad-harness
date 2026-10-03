@@ -140,6 +140,40 @@ The equivalent GUI actions, if you want them via `run_action`, are
 `pcbnew.EditorControl.importSpecctraSession` — but those open file dialogs, so
 prefer the Python functions.
 
+### Measured: freerouting on a dense, mostly hand-routed board
+
+Freerouting 2.3.0 headless (`java -jar freerouting-executable.jar --gui.enabled=false
+-de b.dsn -do b.ses -mp N`) on a 148-part, 2-layer RP2350 board with ~1500 existing
+wires and 48 remaining connections: **unusable.** It reported 655 violations on the
+untouched board under its own rule model, and after 5 passes still had 51 of 99
+items unrouted (10+ minutes). What was learned on the way:
+
+- `ExportSpecctraDSN` already writes every existing track as `(type fix)`; there is
+  no need to lock tracks first.
+- By default freerouting runs a **fanout stage on every SMD pin** (519 of 619 here),
+  adding stubs and vias all over a finished layout. Pass
+  `--router.fanout.enabled=false --router.optimizer.enabled=false`.
+- To route only some nets, empty the other nets' `(pins ...)` lists in the
+  `(network ...)` section. The nets (and their fixed wires) stay as obstacles.
+- Freerouting sees zones as `plane` outlines, not fills, so its unrouted count
+  differs from KiCad's (99 vs 48 here).
+
+What worked instead is `examples/route_unconnected.py`: an A* maze router on a raster
+of KiCad's own copper polygons, fed by the DRC `unconnected_items` pairs (whose
+`uuid`s map straight to board items). 48 -> 3 in ~2 minutes with no new clearance
+errors, and `examples/stitch_gnd_islands.py` for pour islands. The traps were all
+about **ground pour**: new tracks quietly isolate GND pads and pour regions. Find
+the culprit by stripping one net's new tracks at a time, refilling and re-running
+DRC (about 20 s per try); then fence that spot off with `--block`.
+
+### pcbnew connectivity from Python is not enough to find islands
+
+`BOARD.GetConnectivity().GetConnectedItems(item)` works but does **not** follow
+zone-only connections reliably: pads that DRC calls connected came back as
+singleton clusters. `GetRatsnestForNet()` returns an unwrapped `RN_NET`
+(no `GetEdges`). For "which pour island is cut off", trust `kicad-cli pcb drc
+--refill-zones` and bisect, not the Python connectivity API.
+
 ## Why rendering beats screenshotting
 
 The instinct is to screenshot the KiCad window. Rendering from the file is

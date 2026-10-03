@@ -65,11 +65,26 @@ def drc(
     severity: str = "error",
     limit: int = 5,
     all_track_errors: bool = False,
+    refill: bool = False,
 ) -> dict:
-    """Run DRC. `severity` is one of: all, error, warning."""
+    """Run DRC. `severity` is one of: all, error, warning.
+
+    `refill` refills zones first, on a temporary copy (the board file is not
+    touched). Without it kicad-cli checks the fills *as saved*, which go stale
+    the moment anything is moved or routed headlessly: phantom clearance
+    violations against old pours, and real islands hidden."""
     with tempfile.TemporaryDirectory() as tmp:
         rpt = os.path.join(tmp, "drc.json")
         cmd = ["kicad-cli", "pcb", "drc", "--format", "json", "--output", rpt]
+        if refill:
+            import shutil
+            src = pcb
+            pcb = os.path.join(tmp, os.path.basename(src))
+            shutil.copy(src, pcb)
+            pro = os.path.splitext(src)[0] + ".kicad_pro"
+            if os.path.exists(pro):  # carries the net classes / rules
+                shutil.copy(pro, os.path.splitext(pcb)[0] + ".kicad_pro")
+            cmd += ["--refill-zones"]
         if severity == "error":
             cmd.append("--severity-error")
         elif severity == "warning":
@@ -90,7 +105,8 @@ def drc(
     footprint = data.get("schematic_parity", []) or data.get("footprint_parity", [])
 
     return {
-        "source": os.path.abspath(pcb),
+        "source": os.path.abspath(src if refill else pcb),
+        "refilled": refill,
         "clean": not (violations or unconnected or footprint),
         "violations": _digest(violations, limit),
         "unconnected": _digest(unconnected, limit),
