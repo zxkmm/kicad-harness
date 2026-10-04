@@ -262,6 +262,12 @@ the zone fills as last saved: you get phantom clearance errors against pour that
 would move, and miss islands your new tracks just created (measured: 13 stale
 clearance errors vanished on refill, while new GND islands only showed up with it).
 
+Violations the user excluded in the project (DRC/ERC dialog → Exclude, often
+with a comment) come back under `excluded`, with their `comment`, and do not
+fail `clean`. Read those comments before "fixing" anything there; they are
+usually deliberate. (kicad-cli's own `--severity-all` mixes them in as live
+errors, while `--severity-error` silently drops them.)
+
 Output is grouped by violation type with a bounded sample per type, because a
 board with 400 unconnected pads produces a report you cannot read otherwise.
 `total` is the true count; `truncated` says whether you are seeing all of them.

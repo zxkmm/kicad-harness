@@ -38,6 +38,8 @@ def _digest(items: list[dict], limit: int) -> dict:
             sev = v.get("severity")
             if sev:
                 item["severity"] = sev
+            if v.get("comment"):
+                item["comment"] = v["comment"]
             locs = []
             for it in v.get("items", []):
                 loc = {"desc": it.get("description", "")}
@@ -58,6 +60,16 @@ def _digest(items: list[dict], limit: int) -> dict:
             }
         )
     return {"total": len(items), "by_type": groups}
+
+
+def _split_excluded(items: list[dict]) -> tuple[list[dict], list[dict]]:
+    """kicad-cli --severity-all also returns violations the user excluded in
+    the project (`"excluded": true`, with their `comment`), still carrying their
+    rule's severity -- so an excluded item reads as a live "error". The
+    narrower --severity-error / --severity-warning filters drop them instead.
+    Keep them apart so they neither fail `clean` nor vanish silently."""
+    live = [v for v in items if not v.get("excluded")]
+    return live, [v for v in items if v.get("excluded")]
 
 
 def drc(
@@ -100,7 +112,7 @@ def drc(
             raise RuntimeError(f"DRC failed:\n{r.stdout}\n{r.stderr}")
         data = _load(rpt)
 
-    violations = data.get("violations", [])
+    violations, excluded = _split_excluded(data.get("violations", []))
     unconnected = data.get("unconnected_items", [])
     footprint = data.get("schematic_parity", []) or data.get("footprint_parity", [])
 
@@ -111,6 +123,7 @@ def drc(
         "violations": _digest(violations, limit),
         "unconnected": _digest(unconnected, limit),
         "schematic_parity": _digest(footprint, limit),
+        "excluded": _digest(excluded, limit),
     }
 
 
@@ -139,11 +152,13 @@ def erc(sch: str, severity: str = "all", limit: int = 5) -> dict:
             v = dict(v)
             v.setdefault("sheet", sheet.get("path"))
             flat.append(v)
+    flat, excluded = _split_excluded(flat)
 
     return {
         "source": os.path.abspath(sch),
         "clean": not flat,
         "violations": _digest(flat, limit),
+        "excluded": _digest(excluded, limit),
     }
 
 
