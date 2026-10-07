@@ -269,6 +269,20 @@ files that load fine and net up wrong:
   `(x, y)` on an instance placed at `(X, Y)` with rotation 0 lands at
   `(X + x, Y - y)`. Rotations fold that flip in, so 90 and 270 are not sign
   swaps of one another: 90 -> `(-y, -x)`, 180 -> `(-x, y)`, 270 -> `(y, x)`.
+- **Mirror is applied after the rotation, in sheet axes.** `(mirror x)` flips
+  the already-rotated offset vertically (`dy -> -dy`), `(mirror y)`
+  horizontally (`dx -> -dx`). So `(at X Y 90) (mirror x)` is *not* "mirror,
+  then rotate 90" — it equals `(at X Y 270) (mirror y)`. Measured by placing
+  an asymmetric part in all 12 rotation/mirror combinations and round-tripping
+  `kicad-cli sch export pdf` (KiCad 10.0.6).
+- **Field angle and justification are relative to the symbol transform.** A
+  property's `(at x y)` is absolute, but KiCad pushes the field's reading
+  direction and its left/right, top/bottom justification through the
+  symbol's rotate+mirror, then flips anything that would read right-to-left
+  or downward (swapping left<->right, and top<->bottom when the text's up
+  side inverted). To make a field *render* at a given angle and justification,
+  search the 2 angles x 3 justifications for the combination that maps to it.
+  Same round-trip measurement.
 - **Connectivity is purely coordinates.** A wire end that misses a pin is a
   separate net and nothing in the file says so. A wire ending on the *middle*
   of another wire needs an explicit `(junction ...)`, or the two are merely
