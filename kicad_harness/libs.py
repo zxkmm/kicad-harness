@@ -477,8 +477,13 @@ def _find_symbol(tree, name: str):
     return None
 
 
-def _collect(node, props: dict, pins: list):
-    """Walk a symbol node, gathering properties and pins from all units."""
+def _collect(node, props: dict, pins: list, unit=None):
+    """Walk a symbol node, gathering properties and pins from all units.
+
+    Unit sub-symbols are named "<Name>_<unit>_<style>"; unit 0 holds pins
+    common to every unit. Each pin records its unit, so a multi-unit part
+    (an FPGA split into banks) can be placed one unit at a time.
+    """
     for child in node[2:] if len(node) > 2 else []:
         if not isinstance(child, list) or not child:
             continue
@@ -511,6 +516,12 @@ def _collect(node, props: dict, pins: list):
                     pin["rotation"] = at[2] if len(at) > 2 else 0
                 if length is not None:
                     pin["length"] = length
+                if unit is not None:
+                    pin["unit"] = unit
                 pins.append(pin)
         elif head == "symbol":
-            _collect(child, props, pins)   # a unit
+            u = None
+            parts = str(child[1]).rsplit("_", 2) if len(child) > 1 else []
+            if len(parts) == 3 and parts[1].isdigit():
+                u = int(parts[1])
+            _collect(child, props, pins, u)   # a unit

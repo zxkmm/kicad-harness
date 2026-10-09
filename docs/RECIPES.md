@@ -292,6 +292,38 @@ files that load fine and net up wrong:
   that requires each pin to land on a wire end will call a third of a healthy
   sheet broken.
 
+Measured while generating two complete hierarchical schematics from text
+(KiCad 10.0.6, 13 sheets, ~450 symbols):
+
+- **Derived symbols: rename the unit sub-symbols when embedding.** `kh sym
+  --sexpr` flattens an `(extends ...)` symbol, but its units keep the
+  *parent's* name — `Sensor_Audio:IM69D130` comes back with units
+  `IM69D120_0_1`, `IM69D120_1_1`. Embedded as-is, `kicad-cli` reports
+  `Failed to load schematic`. Rename each `<Parent>_<u>_<s>` to `<Name>_<u>_<s>`.
+- **Multi-unit parts:** `kh sym --pins` reports each pin's `unit` (unit 0 =
+  pins common to all units). Place one `(symbol ... (unit N))` per unit with the
+  same reference, on any sheet. The ECP5 symbols are 9 units: power, 7 banks, config.
+- **Let KiCad normalise and validate the file.** Write `(version 20260306)`
+  (10.0.6) syntax, then run `kicad-cli sch upgrade --force <file>` on every
+  sheet. It rewrites the file in KiCad's own formatting, or fails with
+  `Failed to load schematic` if the text does not parse. That is a cheap parse
+  check before ERC.
+- **A power symbol's Value sets the net name.** Use `power:+3V3` with Value
+  `+3V3_MIC` to get a net called `+3V3_MIC`. You don't need a custom power symbol.
+- **Global vs local labels.** Make a net a global label only if it appears on
+  more than one sheet. In the exported netlist, local-label nets are named
+  `/<Sheet title>/<NET>`, while global labels and power nets are bare. Strip
+  the path before comparing nets across boards.
+- **Netlist `pinfunction` is `<pin name>_<pin number>`** (`VIN_4`,
+  `SELECT_4`), not the bare pin name.
+- **A PWR_FLAG on a net with no real pins** (only power symbols) gives
+  `pin_not_connected` on the flag plus `power_pin_not_driven`. Put flags on
+  nets that also carry the regulator or connector pin.
+- **Hidden stacked power pins** (113 GND balls at one point) share one
+  connection point. Group pins by transformed coordinate and draw one stub per
+  point. Visible same-name pins at *different* points (FT232H's 11 GNDs) each
+  need their own connection.
+
 Both transforms above are confirmed against a real board: the pin coordinates
 they produce land exactly on the wire endpoints, junctions and coincident pins
 that KiCad's own netlister agrees on.
